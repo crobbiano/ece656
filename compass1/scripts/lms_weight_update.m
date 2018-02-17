@@ -5,9 +5,9 @@ function [ next_weights ] = lms_weight_update( datamat, curr_weights, desired, l
     %   w(k+1) using the sample correlation and cross correlations.  This
     %   makes w_i(k+1)= w_i(k) + mu*sum_l(x(l)*e_i(l))
     
-    thing = datamat'*curr_weights;
-    e = desired - datamat'*curr_weights; 
-    thing2 = learning_rate*datamat*e;
-    next_weights = curr_weights + learning_rate*datamat*e;
+    thing = curr_weights'*datamat;
+    e = desired - curr_weights'*datamat; 
+    thing2 = learning_rate*datamat*e';
+    next_weights = curr_weights + learning_rate*datamat*e';
 end
 
