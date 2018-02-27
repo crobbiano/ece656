@@ -43,16 +43,16 @@ weights_optimal = Rxx\Rxd;
 %% Use a Nth order AR model and LMS algorithm to find the coefficients
 %  of the AR model.  Compare the results from the LMS with the results
 %  using the normal equation
-numAttempts = 60;
+numAttempts = 1;
 weights_record = zeros(N, numAttempts);
 weights_prev = zeros(N, M);
 weights_prev2 = zeros(N, M);
 for kk = 1:numAttempts
     costs = Inf(numAttempts, 1);
     costs2 = Inf(numAttempts, 1);
-    weights = -1 + 2*rand(N, M);
+%     weights = -1 + 2*rand(N, M);
 %     weights = weights/norm(weights);
-%     weights = zeros(N, M);
+    weights = zeros(N, M);
     cost = zeros(2,1);
     cost2 = zeros(2,1);
     cost(1) = 12*max(max((TrainX(N+1:N+M,:) - weights'*TrainX(1:N,:)).^2));
@@ -61,7 +61,7 @@ for kk = 1:numAttempts
     cost2(2) = 1.1*immse(TrainX(N+1:N+M,:), weights'*TrainX(1:N,:));
     cost_thresh = .000001;
     cost_idx = 2;
-    learning_rate = .00003;
+    learning_rate = .00001;
     % while (cost(cost_idx-1) - cost(cost_idx) > .000003)
     while ( cost(cost_idx) > cost_thresh)
          
@@ -104,7 +104,7 @@ for kk = 1:numAttempts
 end
 
 %% Find best from runs
-[best, best_idx] = min(costs);
+[best, best_idx] = min(costs2);
 best_weights = weights_record(:, best_idx);
 % best_weights = best_weights/norm(best_weights)
 
