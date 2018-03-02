@@ -30,10 +30,11 @@ N=3;
 M=1;
 display(['Using ' num2str(N) 'th order AR model'])
 TrainX = zeros(N+M, floor(numel(TrainPrice)/(N+M)));
+TrainX = zeros(N+M, numel(TrainPrice));
 idx = 0;
-for i=1:size(TrainX,2)-1
-    idx = idx + N+M;
-    TrainX(:,i) = TrainPrice(idx:idx+N+M-1);
+for i=1:size(TrainX,2)-(N+M)
+%     idx = idx + N+M;
+    TrainX(:,i) = TrainPrice(i:i+N+M-1);
 end
 
 Rxx = corr(TrainX(1:N,:)');
@@ -43,16 +44,16 @@ weights_optimal = Rxx\Rxd;
 %% Use a Nth order AR model and LMS algorithm to find the coefficients
 %  of the AR model.  Compare the results from the LMS with the results
 %  using the normal equation
-numAttempts = 1;
+numAttempts = 20;
 weights_record = zeros(N, numAttempts);
 weights_prev = zeros(N, M);
 weights_prev2 = zeros(N, M);
 for kk = 1:numAttempts
     costs = Inf(numAttempts, 1);
     costs2 = Inf(numAttempts, 1);
-%     weights = -1 + 2*rand(N, M);
+    weights = -1 + 2*rand(N, M);
 %     weights = weights/norm(weights);
-    weights = zeros(N, M);
+%     weights = zeros(N, M);
     cost = zeros(2,1);
     cost2 = zeros(2,1);
     cost(1) = 12*max(max((TrainX(N+1:N+M,:) - weights'*TrainX(1:N,:)).^2));
@@ -61,21 +62,21 @@ for kk = 1:numAttempts
     cost2(2) = 1.1*immse(TrainX(N+1:N+M,:), weights'*TrainX(1:N,:));
     cost_thresh = .000001;
     cost_idx = 2;
-    learning_rate = .00001;
+    learning_rate = .000001;
     % while (cost(cost_idx-1) - cost(cost_idx) > .000003)
-    while ( cost(cost_idx) > cost_thresh)
+    while ( cost2(cost_idx) > cost_thresh)
          
-        if ((abs(cost(cost_idx-1) - cost(cost_idx)) < .0000001) || abs(cost(cost_idx) > cost(cost_idx-1)))
+        if ((abs(cost2(cost_idx-1) - cost2(cost_idx)) < .0000001) || abs(cost2(cost_idx) > cost2(cost_idx-1)))
         
             % Reset the weight and cost index to previous iteration and
             % reduc learning rate
             learning_rate = learning_rate / 10;
             weight_prev = weights;
             weights = weights_prev2;
-            cost(cost_idx) = cost_thresh+.001*cost_thresh;
+            cost2(cost_idx) = cost_thresh+.001*cost_thresh;
             cost_idx = cost_idx - 1;     
             if learning_rate <= 1e-30
-                if abs(cost(cost_idx) > cost(cost_idx-1))
+                if abs(cost2(cost_idx) > cost2(cost_idx-1))
                     display('broken')
                 else
                     display('not broken')
@@ -151,50 +152,105 @@ legend('True','LMS Estimate', 'Optimal')
 
 
 %% WRLS search
-%% Use a Nth order AR model and LMS algorithm to find the coefficients
+%% Use a Nth order AR model and RLS algorithm to find the coefficients
 %  of the AR model.  Compare the results from the LMS with the results
 %  using the normal equation
-numAttempts = 0;
-weights_record = zeros(N, numAttempts);
-weights_prev = zeros(N, M);
-for kk = 1:numAttempts
-    costs = zeros(numAttempts, 1);
-    weights = -1 + 2*rand(N, M);
+numAttemptsRLS = 1;
+weights_recordRLS = zeros(N, numAttemptsRLS);
+weights_prevRLS = zeros(N, M);
+for kk = 1:numAttemptsRLS
+    costsRLS = zeros(numAttemptsRLS, 1);
+    weightsRLS = -1 + 2*rand(N, M);
 %     weights = weights/norm(weights);
 %     weights = zeros(N, M);
-    cost = zeros(2,1);
-    cost(1) = 12*max(max((TrainX(N+1:N+M,:) - weights'*TrainX(1:N,:)).^2));
-    cost(2) = 11*max(max((TrainX(N+1:N+M,:) - weights'*TrainX(1:N,:)).^2));
-    cost_thresh = .01;
-    cost_idx = 2;
-    learning_rate = .000001;
+    costRLS = zeros(2,1);
+    costRLS(1) = 12*max(max((TrainX(N+1:N+M,:) - weightsRLS'*TrainX(1:N,:)).^2));
+    costRLS(2) = 11*max(max((TrainX(N+1:N+M,:) - weightsRLS'*TrainX(1:N,:)).^2));
+    cost_threshRLS = .01;
+    cost_idxRLS = 2;
+    learning_rateRLS = .000001;
     
-    P = .5*eye(N);
+    P = .2*eye(N);
+    gamma = 0.75;
+    a = 1.5;
     % while (cost(cost_idx-1) - cost(cost_idx) > .000003)
-    while ( cost(cost_idx) > cost_thresh)
-%         if ((abs(cost(cost_idx-1) - cost(cost_idx)) < .000001) || cost(cost_idx) > cost(cost_idx-1))
-%             % Reset the weight and cost index to previous iteration and
-%             % reduc learning rate
-%             learning_rate = learning_rate / 10;
-%             weights = weights_prev;
-%             cost_idx = cost_idx - 1;
-%             if learning_rate <= 1e-30
-%                 break
-%             end
-%         end
-        cost_idx = cost_idx + 1;
-        cost(cost_idx) = max(max((TrainX(N+1:N+M,:) - weights'*TrainX(1:N,:)).^2));
-        if (cost(cost_idx) > cost(cost_idx-1))
+    while ( costRLS(cost_idxRLS) > cost_threshRLS)
+        if ((abs(costRLS(cost_idxRLS-1) - costRLS(cost_idxRLS)) < .000001) || costRLS(cost_idxRLS) > costRLS(cost_idxRLS-1))
+            % Reset the weight and cost index to previous iteration and
+            % reduc learning rate
+            break
+        end
+        cost_idxRLS = cost_idxRLS + 1;
+        costRLS(cost_idxRLS) = max(max((TrainX(N+1:N+M,:) - weightsRLS'*TrainX(1:N,:)).^2));
+        if (costRLS(cost_idxRLS) > costRLS(cost_idxRLS-1))
 %             display('Cost went up. Descent property DNE.  Try smaller learning rate')
         end
-        weights_prev = weights;
-        [weights, P] = wrls_weight_update(TrainX(1:N,:), weights, .9, P, TrainX(N+1:N+M,:)', 5);
-        if (mod(cost_idx,1000) == 0)
-            display(['Epoch: ' num2str(cost_idx) ', Cost: ' num2str(cost(cost_idx)) ' MSE: ' num2str(cost2(cost_idx)) ])
+        for n=1:size(TrainX(1:N,:),2)
+            if TrainX(1:N,n)'*weightsRLS <= 0
+                net = 0;
+            elseif TrainX(1:N,n)'*weightsRLS >= a
+                net = 1;
+            else
+                net = TrainX(1:N,n)'*weightsRLS;
+            
+            gain = P*TrainX(1:N,n)/(gamma + TrainX(1:N,n)'*P*TrainX(1:N,n));
+            P = (1/gamma)*(eye(N) - gain*TrainX(1:N,n)')*P;
+            weightsRLS = weightsRLS + gain*(TrainX(N+1:N+M,n) - (1/a)*net);
+            end
         end
+%         [weights, P] = wrls_weight_update(TrainX(1:N,:), weights, .99, P, TrainX(N+1:N+M,:)', 50);
+%         if (mod(cost_idxRLS,1000) == 0)
+            display(['Epoch: ' num2str(cost_idxRLS) ', Cost: ' num2str(costRLS(cost_idxRLS)) ])
+%         end
     end
-    display(['Loop: ' num2str(kk) ' Epoch: ' num2str(cost_idx) ', Cost: ' num2str(cost(cost_idx)) ' MSE: ' num2str(cost2(cost_idx)) ])
-    costs(kk) = cost(cost_idx);
-    costs2(kk) = cost2(cost_idx);
-    weights_record(:, kk) = weights;
+    display(['Loop: ' num2str(kk) ' Epoch: ' num2str(cost_idxRLS) ', Cost: ' num2str(costRLS(cost_idxRLS)) ])
+    costsRLS(kk) = costRLS(cost_idxRLS);
+    weights_recordRLS(:, kk) = weightsRLS;
 end
+%% Plot Stuff
+% Find best from runs
+[bestRLS, best_idxRLS] = min(costsRLS);
+best_weightsRLS = weights_recordRLS(:, best_idxRLS);
+%  Use the best weights to do some predictions
+pred_idxRLS = 1;
+% endLen = inputDataLen-(N-1);
+predLenRLS = 400;
+endLenRLS = predLenRLS;
+predictedRLS = zeros(predLenRLS,M);
+predicted_optimalRLS = zeros(predLenRLS,M);
+answersRLS = zeros(predLenRLS,M);
+for i=1:endLenRLS
+    % Form the inputs
+    inputs = TestPrice(i:i+(N-1));
+    answersRLS(pred_idxRLS,:) = TestPrice(i+N:i+N+(M-1));
+    predictedRLS(pred_idxRLS,:) = weights_recordRLS(:,best_idxRLS)'*inputs;
+    predicted_optimalRLS(pred_idxRLS,:) = weights_optimal'*inputs;
+    pred_idxRLS = pred_idxRLS + 1;
+end
+
+figure(2); clf;
+subplot(2,1,1); hold on; 
+plot(cost)
+plot(costRLS)
+title('Learning Rate')
+xlabel('Epoch')
+ylabel('Cost')
+legend('LMS','RLS Estimate')
+
+subplot(2,1,2); hold on;
+% plot(zscore(answers(:,1)), '-')
+% plot(zscore(predicted), '--')
+% plot(zscore(predicted_optimal(:,:)))
+plot((answersRLS(:,1)), '-')
+plot((predictedRLS), '--')
+plot((predicted), '--.')
+plot((predicted_optimalRLS(:,:)))
+title('Price Predictions')
+xlabel('Time')
+ylabel('Price')
+legend('True','LMS Estimate','RLS Estimate', 'Optimal')
+
+immse_opt = immse(answersRLS, predicted_optimalRLS);
+immse_rls = immse(answersRLS, predictedRLS);
+
+display(['MSE RLS: ' num2str(immse_rls)]);display([ 'MSE Optimal: ' num2str(immse_opt)])
