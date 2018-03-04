@@ -20,8 +20,8 @@ price  = cell2mat(data(:, 6));      % close Price
 price = zscore(price);
 inputDataLen = length(price);       % length of the input data, used in 'start' var below
 
-TrainPrice = price(1:floor(end/3));
-TestPrice = price(floor(end/3+1):end);
+TrainPrice = price(1:floor(end*1/3));
+TestPrice = price(floor(end*1/3+1):end);
 
 clear FileName FilePath File data fd
 
@@ -44,29 +44,29 @@ weights_optimal = Rxx\Rxd;
 %% Use a Nth order AR model and LMS algorithm to find the coefficients
 %  of the AR model.  Compare the results from the LMS with the results
 %  using the normal equation
-numAttempts = 20;
+numAttempts = 1;
 weights_record = zeros(N, numAttempts);
 weights_prev = zeros(N, M);
 weights_prev2 = zeros(N, M);
 for kk = 1:numAttempts
     costs = Inf(numAttempts, 1);
     costs2 = Inf(numAttempts, 1);
-    weights = -1 + 2*rand(N, M);
+%     weights = -1 + 2*rand(N, M);
 %     weights = weights/norm(weights);
-%     weights = zeros(N, M);
+    weights = zeros(N, M);
     cost = zeros(2,1);
     cost2 = zeros(2,1);
-    cost(1) = 12*max(max((TrainX(N+1:N+M,:) - weights'*TrainX(1:N,:)).^2));
-    cost(2) = 11*max(max((TrainX(N+1:N+M,:) - weights'*TrainX(1:N,:)).^2));
+    cost(1) = 1.2*max(max((TrainX(N+1:N+M,:) - weights'*TrainX(1:N,:)).^2));
+    cost(2) = 1.1*max(max((TrainX(N+1:N+M,:) - weights'*TrainX(1:N,:)).^2));
     cost2(1) = 1.2*immse(TrainX(N+1:N+M,:), weights'*TrainX(1:N,:));
     cost2(2) = 1.1*immse(TrainX(N+1:N+M,:), weights'*TrainX(1:N,:));
     cost_thresh = .000001;
     cost_idx = 2;
-    learning_rate = .000001;
+    learning_rate = .00000001;
     % while (cost(cost_idx-1) - cost(cost_idx) > .000003)
     while ( cost2(cost_idx) > cost_thresh)
          
-        if ((abs(cost2(cost_idx-1) - cost2(cost_idx)) < .0000001) || abs(cost2(cost_idx) > cost2(cost_idx-1)))
+        if ((abs(cost2(cost_idx-1) - cost2(cost_idx)) < .0000000001) || abs(cost2(cost_idx) > cost2(cost_idx-1)))
         
             % Reset the weight and cost index to previous iteration and
             % reduc learning rate
@@ -164,18 +164,18 @@ for kk = 1:numAttemptsRLS
 %     weights = weights/norm(weights);
 %     weights = zeros(N, M);
     costRLS = zeros(2,1);
-    costRLS(1) = 12*max(max((TrainX(N+1:N+M,:) - weightsRLS'*TrainX(1:N,:)).^2));
-    costRLS(2) = 11*max(max((TrainX(N+1:N+M,:) - weightsRLS'*TrainX(1:N,:)).^2));
-    cost_threshRLS = .01;
+    costRLS(1) = 1.2*max(max((TrainX(N+1:N+M,:) - weightsRLS'*TrainX(1:N,:)).^2));
+    costRLS(2) = 1.1*max(max((TrainX(N+1:N+M,:) - weightsRLS'*TrainX(1:N,:)).^2));
+    cost_threshRLS = .000000000001;
     cost_idxRLS = 2;
     learning_rateRLS = .000001;
     
-    P = .2*eye(N);
+    P = .5*eye(N);
     gamma = 0.75;
     a = 1.5;
     % while (cost(cost_idx-1) - cost(cost_idx) > .000003)
     while ( costRLS(cost_idxRLS) > cost_threshRLS)
-        if ((abs(costRLS(cost_idxRLS-1) - costRLS(cost_idxRLS)) < .000001) || costRLS(cost_idxRLS) > costRLS(cost_idxRLS-1))
+        if ((abs(costRLS(cost_idxRLS-1) - costRLS(cost_idxRLS)) < .0000000000000001) || costRLS(cost_idxRLS) > costRLS(cost_idxRLS-1))
             % Reset the weight and cost index to previous iteration and
             % reduc learning rate
             break
@@ -229,15 +229,22 @@ for i=1:endLenRLS
 end
 
 figure(2); clf;
-subplot(2,1,1); hold on; 
+% subplot(2,2,1); 
 plot(cost)
-plot(costRLS)
-title('Learning Rate')
+title('LMS Learning Rate')
 xlabel('Epoch')
 ylabel('Cost')
-legend('LMS','RLS Estimate')
 
-subplot(2,1,2); hold on;
+figure(3); clf
+% subplot(2,2,2); 
+plot(costRLS)
+title('RLS Learning Rate')
+xlabel('Epoch')
+ylabel('Cost')
+
+figure(4); clf
+% subplot(2,2,[3, 4]); 
+hold on;
 % plot(zscore(answers(:,1)), '-')
 % plot(zscore(predicted), '--')
 % plot(zscore(predicted_optimal(:,:)))
@@ -248,9 +255,30 @@ plot((predicted_optimalRLS(:,:)))
 title('Price Predictions')
 xlabel('Time')
 ylabel('Price')
-legend('True','LMS Estimate','RLS Estimate', 'Optimal')
+legend('True','RLS Estimate','LMS Estimate', 'Optimal')
+xlim([190 210])
 
 immse_opt = immse(answersRLS, predicted_optimalRLS);
 immse_rls = immse(answersRLS, predictedRLS);
 
-display(['MSE RLS: ' num2str(immse_rls)]);display([ 'MSE Optimal: ' num2str(immse_opt)])
+display(['MSE LMS: ' num2str(immse_lms)]);display(['MSE RLS: ' num2str(immse_rls)]);display([ 'MSE Optimal: ' num2str(immse_opt)])
+
+%% Quantify the error
+error_opt = answers - predicted_optimalRLS;
+error_lms = answers - predicted;
+error_rls = answers - predictedRLS;
+figure(6); clf;
+h0 = histfit(error_opt)
+figure(7); clf;
+h1 = histfit(error_lms)
+figure(8); clf;
+h2 = histfit(error_rls)
+
+%% Look at xcorr
+[acor,lag] = xcorr(price);
+[~,I] = max(abs(acor));
+timeDiff = lag(I)         % sensor 2 leads sensor 1 by 350 samples
+figure(19); clf
+plot(lag,acor);
+grid
+title('Autocorrelation function for data')
