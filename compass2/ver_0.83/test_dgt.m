@@ -1,7 +1,7 @@
 %Test convolutional network for classification quality
 correct=0;
 %Testing on 500 random test samples
-numtest = 5000;
+numtest = 500;
 [I_testp,labnew] = preproc_data(I_test,numtest,labels_test,0);
 for t=1:numtest
     
