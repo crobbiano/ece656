@@ -1,7 +1,7 @@
 %Convolutional neural network for handwriten digits recognition: training
 %and simulation.
 %(c)Mikhail Sirotenko, 2009.
-%This program implements the convolutional neural network for MNIST handwriten 
+%This program implements the convolutional neural network for MNIST handwriten
 %digits recognition, created by Yann LeCun. CNN class allows to make your
 %own convolutional neural net, defining arbitrary structure and parameters.
 %It is assumed that MNIST database is located in './MNIST' directory.
@@ -24,141 +24,98 @@
 %finite differences
 %URL: http://web.mit.edu/jvb/www/cv.html
 
-clear;
+clear all;
 clc;
-%Load the digits into workspace
-[I,labels,I_test,labels_test] = readMNIST(6000, 'MNIST'); 
+close all
 %%
+imds = imageDatastore('D:\Documents\ece656\compass2\files', 'IncludeSubfolders',true,'LabelSource','foldernames');
+numTrainFiles = 750;
+[imdsTrain,imdsValidation] = splitEachLabel(imds,numTrainFiles,'randomize');
+%% 3 layer
+layers3 = [
+    imageInputLayer([28 28 1])
+    
+    convolution2dLayer(3,8,'Padding',1)
+    batchNormalizationLayer
+    reluLayer
+    
+    maxPooling2dLayer(2,'Stride',2)
+    
+    convolution2dLayer(3,16,'Padding',1)
+    batchNormalizationLayer
+    reluLayer
+    
+    maxPooling2dLayer(2,'Stride',2)
+    
+    convolution2dLayer(3,32,'Padding',1)
+    batchNormalizationLayer
+    reluLayer
+    
+    maxPooling2dLayer(2,'Stride',2)
+    
+    fullyConnectedLayer(10)
+    softmaxLayer
+    classificationLayer];
 
-%Define the structure according to [2]
-%Total number of layers
-numLayers = 6; 
-%Number of subsampling layers
-numSLayers = 2; 
-%Number of convolutional layers
-numCLayers = 2; 
-%Number of fully-connected layers
-numFLayers = 2;
-%Number of input images (simultaneously processed). Need for future
-%releases, now only 1 is possible
-numInputs = 1; 
-%Image width
-InputWidth = 32; 
-%Image height
-InputHeight = 32;
-%Number of outputs
-numOutputs = 10; 
-%Create an empty convolutional neural network with deined structure
-sinet = cnn(numLayers,numFLayers,numInputs,InputWidth,InputHeight,numOutputs);
+options = trainingOptions('sgdm', ...
+    'MaxEpochs',4, ...
+    'ValidationData',imdsValidation, ...
+    'ValidationFrequency',30, ...
+    'Verbose',false, ...
+    'Plots','training-progress');
 
-%Now define the network parameters
+[net3, tr3] = trainNetwork(imdsTrain,layers3,options);
 
+YPred = classify(net3,imdsValidation);
+YValidation = imdsValidation.Labels;
 
-%Due to implementation specifics layers are always in pairs. First must be
-%subsampling and last (before fulli connected) is convolutional layer.
-%That's why here first layer is dummy.
-sinet.SLayer{1}.SRate = 1;
-sinet.SLayer{1}.WS{1} = ones(size(sinet.SLayer{1}.WS{1}));
-sinet.SLayer{1}.BS{1} = zeros(size(sinet.SLayer{1}.BS{1}));
-sinet.SLayer{1}.TransfFunc = 'purelin';
-%Weights 1
-%Biases 1
+accuracy = sum(YPred == YValidation)/numel(YValidation)
+figure(17); plotconfusion(YValidation,YPred);
+testt = grp2idx(YValidation);
+testt = testt - 1;
+testt10 = num2bin10(testt);
+pred = grp2idx(YPred);
+pred = pred - 1;
+pred = num2bin10(pred);
+figure(5), plotroc(testt10,pred)
+%% 2 lyer
+layers2 = [
+    imageInputLayer([28 28 1])
+    
+    convolution2dLayer(3,8,'Padding',1)
+    batchNormalizationLayer
+    reluLayer
+    
+    maxPooling2dLayer(2,'Stride',2)
+    
+    convolution2dLayer(3,32,'Padding',1)
+    batchNormalizationLayer
+    reluLayer
+    
+    maxPooling2dLayer(2,'Stride',2)
+    
+    fullyConnectedLayer(10)
+    softmaxLayer
+    classificationLayer];
 
+options = trainingOptions('sgdm', ...
+    'MaxEpochs',4, ...
+    'ValidationData',imdsValidation, ...
+    'ValidationFrequency',30, ...
+    'Verbose',false, ...
+    'Plots','training-progress');
 
-%Second layer - 6 convolution kernels with 5x5 size 
-sinet.CLayer{2}.numKernels = 16;
-sinet.CLayer{2}.KernWidth = 5;
-sinet.CLayer{2}.KernHeight = 5;
-%Weights 150
-%Biases 6
+[net2, tr2] = trainNetwork(imdsTrain,layers2,options);
 
-%Third layer
-%Subsampling rate
-% sinet.SLayer{3}.SRate = 2;
-%Weights 6
-%Biases 6
+YPred = classify(net2,imdsValidation);
+YValidation = imdsValidation.Labels;
 
-%Forth layer - 16 kernels with 5x5 size 
-% sinet.CLayer{4}.numKernels = 16;
-% sinet.CLayer{4}.KernWidth = 5;
-% sinet.CLayer{4}.KernHeight = 5;
-%Weights 150
-%Biases 6
-
-%Fifth layer
-%Subsampling rate
-sinet.SLayer{3}.SRate = 2;
-%Weights 6
-%Biases 6
-
-%Sixth layer - outputs 120 feature maps 1x1 size
-sinet.CLayer{4}.numKernels = 120;
-sinet.CLayer{4}.KernWidth = 5;
-sinet.CLayer{4}.KernHeight = 5;
-%Weights 3000
-%Смещений 120
-
-%Seventh layer - fully connected, 84 neurons
-sinet.FLayer{5}.numNeurons = 84;
-%Weights 10080
-%Biases 84
-
-%Eight layer - fully connected, 10 output neurons
-sinet.FLayer{6}.numNeurons = 10;
-%Weights 840
-%Biases 10
-
-%Initialize the network
-sinet = init(sinet);
-
-%According to [2] the generalisation is better if there's unsimmetry in
-%layers connections. Yann LeCun uses this kind of connection map:
-% sinet.CLayer{4}.ConMap = ...
-% [1 0 0 0 1 1 1 0 0 1 1 1 1 0 1 1;
-%  1 1 0 0 0 1 1 1 0 0 1 1 1 1 0 1;
-%  1 1 1 0 0 0 1 1 1 0 0 1 0 1 1 1;
-%  0 1 1 1 0 0 1 1 1 1 0 0 1 0 1 1;
-%  0 0 1 1 1 0 0 1 1 1 1 0 1 1 0 1; 
-%  0 0 0 1 1 1 0 0 1 1 1 1 0 1 1 1; 
-% ]';
-%but some papers proposes to randomly generate the connection map. So you
-%can try it:
-sinet.CLayer{4}.ConMap = round(rand(size(sinet.CLayer{4}.ConMap))-0.1);
-sinet.SLayer{1}.WS{1} = ones(size(sinet.SLayer{1}.WS{1}));
-sinet.SLayer{1}.BS{1} = zeros(size(sinet.SLayer{1}.BS{1}));
-%In my impementation output layer is ordinary tansig layer as opposed to
-%[1,2], but I plan to implement the radial basis output layer
-
-%sinet.FLayer{8}.TransfFunc = 'radbas';
-%%
-%Now the final preparations
-%Number of epochs
-sinet.epochs = 3;
-%Mu coefficient for stochastic Levenberg-Markvardt
-sinet.mu = 0.001;
-%Training coefficient
-%sinet.teta =  [50 50 20 20 20 10 10 10 5 5 5 5 1]/100000;
-sinet.teta =  0.0005;
-%0 - Hessian running estimate is calculated every iteration
-%1 - Hessian approximation is recalculated every cnet.Hrecomp iterations
-%2 - No Hessian calculations are made. Pure stochastic gradient
-sinet.HcalcMode = 0;    
-sinet.Hrecalc = 300; %Number of iterations to passs for Hessian recalculation
-sinet.HrecalcSamplesNum = 50; %Number of samples for Hessian recalculation
-
-%Teta decrease coefficient
-sinet.teta_dec = 0.4;
-
-%Images preprocessing. Resulting images have 0 mean and 1 standard
-%deviation. Go inside the preproc_data for details
-[Ip, labtrn] = preproc_data(I,1000,labels,0);
-[I_testp, labtst] = preproc_data(I_test,100,labels_test,0);
-
-trainnet = 1
-if (trainnet)
-    %Actualy training
-    sinet = train(sinet,Ip,labtrn,I_testp,labtst);
-    save('trained_cnn_new.mat', 'sinet')
-else
-    load('trained_cnn_6_layer.mat')
-end
+accuracy = sum(YPred == YValidation)/numel(YValidation)
+figure(18); plotconfusion(YValidation,YPred);testt = grp2idx(YValidation);
+testt = grp2idx(YValidation);
+testt = testt - 1;
+testt10 = num2bin10(testt);
+pred = grp2idx(YPred);
+pred = pred - 1;
+pred = num2bin10(pred);
+figure(6), plotroc(testt10,pred)

@@ -2,6 +2,7 @@
 % cnn and bpnn with LM networks
 clear all
 clc
+close all
 % The CNN path contains something that breaks the builtin feedforward nets,
 % reset the path to launch default
 path(pathdef)
@@ -17,6 +18,8 @@ total_num = total_num_training  + total_num_testing;
 allimgs = [trainimgs, testimgs];
 alllabels = [trainlabels; testlabels]';
 alllabels10 = num2bin10(alllabels);
+
+
 
 %% Uniformly sample the training set to extract 15% of the samples.  This choosed approx equal number from each class
 [trainsamples trainsamplesidxs] = datasample(allimgs,size(allimgs,2)*.20, 'Replace', false);
@@ -45,12 +48,46 @@ validsampleslabel = othersampleslabel(validsamplesidxs);
 % sum(trainsampleslabels3)
 
 % FIXME - may want to do data normalization
+%% Generate some images for viewing the original data set
+inputimage = zeros(28*10, 28*20);
+idx = 1;
+for i=1:20
+    for j=1:10
+        temp = rot90(trainsamples{idx}, -1);
+        temp = fliplr(temp) ;
+        inputimage((j-1)*28 + 1:(j-1)*28 + 28, (i-1)*28 + 1:(i-1)*28 + 28) = temp;
+        idx = idx + 1;
+    end
+end
+
 %% Vectorize all samples
 trainsamples_vec = zeros(28*28, numel(trainsamples));
+testsamples_vec = zeros(28*28, numel(testsamples));
+validsamples_vec = zeros(28*28, numel(validsamples));
 allimgs_vec = zeros(28*28, numel(allimgs));
 % imshow(reshape(trainsamples_vec(:,1), 28, 28))
+writefiles = 0;
+
 for i = 1:numel(trainsamples)
     trainsamples_vec(:, i) = reshape(trainsamples{i}, 28*28, 1);
+    if (writefiles)
+        filename = sprintf('imgs_training/train_%05d.png',i);
+        imwrite(trainsamples{i}, filename);
+    end
+end
+for i = 1:numel(testsamples)
+    testsamples_vec(:, i) = reshape(testsamples{i}, 28*28, 1);
+    if (writefiles)
+        filename = sprintf('imgs_testing/test_%05d.png',i);
+        imwrite(testsamples{i}, filename);
+    end
+end
+for i = 1:numel(validsamples)
+    validsamples_vec(:, i) = reshape(validsamples{i}, 28*28, 1);
+    if (writefiles)
+        filename = sprintf('imgs_valid/valid_%05d.png',i);
+        imwrite(validsamples{i}, filename);
+    end
 end
 for i = 1:numel(allimgs)
     allimgs_vec(:, i) = reshape(allimgs{i}, 28*28, 1);
@@ -95,9 +132,9 @@ net.output.processFcns = {'removeconstantrows','mapminmax'};
 % For a list of all data division functions type: help nndivide
 net.divideFcn = 'dividerand';  % Divide data randomly
 net.divideMode = 'sample';  % Divide up every sample
-net.divideParam.trainRatio = 50/100;
-net.divideParam.valRatio = 25/100;
-net.divideParam.testRatio = 25/100;
+net.divideParam.trainRatio = 35/100;
+net.divideParam.valRatio = 30/100;
+net.divideParam.testRatio = 35/100;
 
 % Choose a Performance Function
 % For a list of all performance functions type: help nnperformance
@@ -108,7 +145,7 @@ net.performFcn = 'crossentropy';  % Cross-Entropy
 net.plotFcns = {'plotperform','plottrainstate','ploterrhist', ...
     'plotconfusion', 'plotroc'};
 
-trainnet = 1
+trainnet = 1;
 if (trainnet)
     % Train the Network
     [net,tr] = train(net,x,t);
@@ -116,7 +153,6 @@ if (trainnet)
 else
     load('trained_bpnn.mat')
 end
-%%
 %% Test the Network
 y = net(testx);
 e = gsubtract(testt,y);
