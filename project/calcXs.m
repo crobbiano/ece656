@@ -1,4 +1,4 @@
-function [ z ] = calcZis( etas, x, kernel_mats, Y, samples, ls )
+function [ x_new ] = calcXs( etas, x, kernel_mats, Y, samples, ls )
     %calcZis Calculates the zi's
     %   Find the current kernel which is a mixture of all ranked kernels
     %   then classifies all samples using the current kernel and
@@ -18,18 +18,19 @@ function [ z ] = calcZis( etas, x, kernel_mats, Y, samples, ls )
     end
     
     % Find class
-    z=zeros(1, size(samples,2));
+    x_new=zeros(size(x,2));
     for i=1:size(samples,2)
         kernel_copy = curr_kernel;
         kernel_copy(:,i) = 0; kernel_copy(i,:) = 0;
+ 
         err = [];
-        for class=1:num_classes
-            err(class) = curr_kernel(i,i) + x(class:class + num_samples_per_class - 1,i)'*...
-                kernel_copy(class:class + num_samples_per_class - 1,class:class + num_samples_per_class - 1)*x(class:class + num_samples_per_class - 1,i)...
-                - 2*kernel_copy(i,class:class + num_samples_per_class - 1)*x(class:class + num_samples_per_class - 1,i);
+        for j=1:size(x, 2)
+            err(j) = curr_kernel(i,i) + x(:,j)'*kernel_copy*x(:,j) - 2*kernel_copy(i,:)*x(:,j)
         end
-        [~, z(i)] = min(err);
+        
+        [~, idx] = min(err);
+        x_new(:,i) = x(:,idx);
     end
-    z=z-1;
+    x_new;
 end
 

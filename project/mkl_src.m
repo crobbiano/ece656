@@ -113,7 +113,14 @@ N = size(Y,2);
 % of Y and call it Y_tilde, then solve for x_i in y_i=(Y_tilde)x_i
 % by solving (18) in the paper.
 % x_i = argmin_x (k(y_i, y_i)+ x^TK(Y_tilde, Y_tilde)x - 2K(y_i, Y_tilde)x - lambda||x_i||^1)
-
+% FIXME? Uses Pseudo inverse to find initial x's
+% Find sparse codes for each sample
+x=zeros(size(Y,2), numel(l));
+for i=1:size(Y,2)
+    Yt = Y;
+    Yt(:,i) = 0;
+    x(:,i) = Yt'*inv(Yt*Yt')*Y(:,i);
+end
 
 %% Initalize kernel weights
 % Start by giving all weight to the most aligned kernel, i.e. ranked_mat{1}
