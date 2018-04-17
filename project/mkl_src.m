@@ -4,11 +4,15 @@ close all
 clc
 %% Load some data
 % Load images and labels
-y1 = [1 5 3 2 6]'; l1 = 0;
-y2 = [3 5 2 4 1]'; l2 = 1;
+y1 = [1 2 1]'; l1 = 0;
+y2 = [1.3 2.1 1.4]'; l2 = 0;
+y3 = [.8 1.5 1]'; l3 = 0;
+y4 = [-0.3 -0.7 -1.1]'; l4 = 1;
+y5 = [-.5 -.8 -1]'; l5 = 1;
+y6 = [-.3 -1.3 -1.3]'; l6 = 1;
 % Build data sample matrix Y and label vector l
-Y = [y1, y2];
-l = [l1 l2];
+Y = [y1, y2, y3, y4, y5, y6];
+l = [l1, l2, l3 ,l4, l5, l6];
 %% Make kernel functions
 % Choose the kernel functions and make vector of them
 kappa  = { ...
@@ -29,7 +33,7 @@ kappa  = { ...
     @(x,y) (x'*y + 2.5)^2; ...
     @(x,y) (x'*y + 2.5)^3; ...
     @(x,y) (x'*y + 2.5)^4; ...
-    @(x,y) tanh(0.1 + 1.0*(x'*y)); ...
+    @(x,y) tanh(0.1 + 1.0*(x'*y)); ...  % Hyperbolic Tangent
     @(x,y) tanh(0.2 + 1.0*(x'*y)); ...
     @(x,y) tanh(0.3 + 1.0*(x'*y)); ...
     @(x,y) tanh(0.4 + 1.0*(x'*y)); ...
@@ -38,7 +42,7 @@ kappa  = { ...
     @(x,y) tanh(0.5 + 0.4*(x'*y)); ...
     @(x,y) tanh(0.5 + 0.6*(x'*y)); ...
     @(x,y) tanh(0.5 + 0.8*(x'*y)); ...
-    @(x,y) exp((-norm(x-y)^2/0.1)); ...
+    @(x,y) exp((-norm(x-y)^2/0.1)); ...  % Gaussian
     @(x,y) exp((-norm(x-y)^2/0.2)); ...
     @(x,y) exp((-norm(x-y)^2/0.3)); ...
     @(x,y) exp((-norm(x-y)^2/0.4)); ...
@@ -69,6 +73,26 @@ for m=1:length(kappa)
     end
     kernel_mats{m} = K;
 end
+
+% Make the ideal matrix - FIXME
+K_ideal = eye(6);
+K_ideal(1,2) = 1; K_ideal(2,1)=1;
+K_ideal(1,3) = 1; K_ideal(3,1)=1;
+K_ideal(2,3) = 1; K_ideal(3,2)=1;
+
+K_ideal(4,5) = 1; K_ideal(5,4)=1;
+K_ideal(5,6) = 1; K_ideal(6,5)=1;
+K_ideal(6,4) = 1; K_ideal(4,6)=1;
+
+%% Get ranked ordering of kernel matrices
+ranked_mats = kernel_mats;
+ranked_kappa = kappa;
+for i=1:length(ranked_mats)
+    alignment_scores(i) = kernelAlignment(kernel_mats{i}, K_ideal);
+end
+[sorted, idx] = sort(alignment_scores,'descend');
+ranked_mats = ranked_mats(idx,:);
+ranked_kappa = ranked_kappa(idx,:);
 %% Setup other parameters
 % sparsity_reg \mu
 mu = .2;
@@ -91,7 +115,10 @@ N = size(Y,2);
 % x_i = argmin_x (k(y_i, y_i)+ x^TK(Y_tilde, Y_tilde)x - 2K(y_i, Y_tilde)x - lambda||x_i||^1)
 
 
-
+%% Initalize kernel weights
+% Start by giving all weight to the most aligned kernel, i.e. ranked_mat{1}
+eta = zeros(1, length(ranked_mats));
+eta(1) = 1;
 
 %% Iterate until quitting conditions are satisfied
 while(t <= T && err>= err_thresh)
@@ -100,8 +127,8 @@ while(t <= T && err>= err_thresh)
         K = kernel_mats{m};
         K(i, :) = 0;
         K(:, i) = 0;
-    % Compute the sparse code x_i as done before - MAKE FNC FOR THIS
-    % Compute the predicted label g_i using x_i
+        % Compute the sparse code x_i as done before - MAKE FNC FOR THIS
+        % Compute the predicted label g_i using x_i
     end
     % Update weights for all m
     
