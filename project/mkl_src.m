@@ -5,11 +5,11 @@ clc
 addpath(genpath('toolbox_optim'));
 %% Load some data
 % Load images and labels
-pos_point = [1 1 ]';
-neg_point = [-2 -3 ]';
+pos_point = [30 30 40]';
+neg_point = [2 3 4]';
 
 % Make 20 random points around pos and neg
-num_samples=20;
+num_samples=30;
 Y = zeros(numel(pos_point), num_samples);
 l = zeros(1, 10);
 for i=1:num_samples/2
@@ -107,14 +107,14 @@ end
 ranked_mats = ranked_mats(idx,:);
 ranked_kappa = ranked_kappa(idx,:);
 %% Setup other parameters
-% sparsity_reg \mu
-mu = .2;
-% overfitting_reg \lambda
+% overfitting_reg \mu
+mu = .05;
+% sparsity_reg \lambda
 lambda = .01;
 % max iterations
-T = 10;
+T = 30;
 % error thresh for convergence
-err_thresh = .01;
+err_thresh = .005;
 err = err_thresh + 1;
 
 % total number of samples
@@ -132,40 +132,39 @@ eta(1) = 1;
 % FIXME? Uses Pseudo inverse to find initial x's
 % Find sparse codes for each sample
 x=zeros(size(Y,2), numel(l));
+curr_kernel = zeros(size(ranked_mats{1},1));
 for i=1:size(Y,2)
-    Yt = Ynorm;
-%     Yt(:,i) = 0;
-%     x(:,i) = getCoeffs(Y(:,i), Yt, lambda, 10000);
-    x(:,i) = getCoeffs2(x(:,i), Y(:,i), Yt, lambda, eta, ranked_kappa, 5000);
+    x(:,i) = getCoeffs2(x(:,i), Y(:,i), Y, i, lambda, eta, ranked_kappa, 5000, curr_kernel);
 end
 
 %% Iterate until quitting conditions are satisfied
 t=0;
 h = zeros(1, size(Y,2));
 while(t <= T && err>= err_thresh)
+    curr_kernel = zeros(size(ranked_mats{1},1));
+    for i=1:length(eta)
+        curr_kernel = curr_kernel + eta(i)*ranked_mats{i};
+    end
     % Compute K_m(Y_tilde, Y_tilde)
 
     % Precompute the predicted labels for each base kernel
+
     
-    
+%     x=zeros(size(Y,2), numel(l));
     for i=1:N
-        %         K = curr_kernel;
-        %         K(i, :) = 0;
-        %         K(:, i) = 0;
-        Yt = Ynorm;
-%         Yt(:,i) = 0;
         % Compute the sparse code x_i
-        x(:,i) = getCoeffs2(x(:,i), Y(:,i), Yt, lambda, eta, ranked_kappa, 1);
+        x(:,i) = getCoeffs2(x(:,i), Y(:,i), Ynorm, i, lambda, eta, ranked_kappa, 1, curr_kernel);
+%         x(:,i) = getCoeffs2(x(:,i), Y(:,i), Yt, lambda, eta, ranked_kappa, 1);
         %         x(:,i) = getCoeffs(Y(:,i), Yt, lambda, 10000);
         % Compute the predicted label g_i using x_i
-        h(i) = calcZis(eta, x(:,i), ranked_mats, Y(:,i), l);
-        
+        h(i) = calcZis(eta, x(:,i), ranked_mats, Y(:,i), l, Y, i, ranked_kappa, curr_kernel);
+       
     end
-    
+        
     g = zeros(length(kappa), N);
     for ker_num=1:length(kappa)
         for i=1:N
-            g(ker_num, i) = calcZis(1, x(:,i), ranked_mats{ker_num}, Y(:,i), l);
+            g(ker_num, i) = calcZis(1, x(:,i), ranked_mats{ker_num}, Y(:,i), l, Y, i, ranked_kappa, curr_kernel);
         end
     end
     
@@ -176,21 +175,30 @@ while(t <= T && err>= err_thresh)
     end
     % Update weights for all m
     % find the best new kernel based on c
-    [best_c_val,best_c_idx] = max(c(c ~=0));
+%     [best_c_val,best_c_idx] = max(c(c ~=0 & eta == 0) );
+%     best_c_val_og = best_c_val;
+%     all_non_0_c_vals = c(c ~=0 & eta == 0);
+%     c_idxs = find(c~=0 & eta == 0);
+%     non_0_c = c(c ~=0 & eta == 0);
+    
+    [best_c_val,best_c_idx] = max(c(c ~=0) );
+    best_c_val_og = best_c_val;
     all_non_0_c_vals = c(c ~=0);
     c_idxs = find(c~=0);
     non_0_c = c(c ~=0);
-    for i=best_c_idx:-1:1
-        if non_0_c(i) > best_c_val + mu
+    for i=c_idxs(best_c_idx):-1:1
+        if (c(i) ~=0 & eta(i) == 0) & (c(i) + mu > best_c_val_og)
             best_c_idx = i;
-            best_c_val = non_0_c(i);
+            best_c_val = c(i);
+%             display(['Changed best_c to higher index: ' num2str(i)])
         end
     end
     
-    new_kernel = c_idxs(best_c_idx);
+    new_kernel = best_c_idx;
     new_kernel_weight = sum(bitand(zm(new_kernel,:), not(z)))/sum(bitor(not(z), not(zm(new_kernel,:))));
     curr_kernel_weight = sum(bitand(z, not(zm(new_kernel,:))))/sum(bitor(not(z), not(zm(new_kernel,:))));
     
+    prev_eta = eta; % save for calcing error
     % Do the actual mixing weight update here
     for m=1:length(kappa)
         if m==new_kernel
@@ -202,15 +210,37 @@ while(t <= T && err>= err_thresh)
     
     % Compute sums of all weights and normalize weights by sum
     total_weights = sum(eta);
-    prev_eta = eta; % save for calcing error
     eta = eta/total_weights;
     
     % set err = ||eta^{t-1}-eta^{t}||_2
-    err = norm(prev_eta - eta,2)
+    err = norm(prev_eta - eta,2);
     
     t = t + 1;
+    display(['Iteration: ' num2str(t) '/' num2str(T) ' Error: ' num2str(err)])
 end
-curr_kernel = zeros(size(kernel_mats{1},1));
-for i=1:length(eta)
-    curr_kernel = curr_kernel + eta(i)*kernel_mats{i};
+
+%% Classify some new points
+pos_point2 = [1 1]';
+neg_point2 = [-2 -3]';
+
+% Make 20 random points around pos and neg
+num_samples2=20;
+Y2 = zeros(numel(pos_point2), num_samples2);
+l2 = zeros(1, num_samples2);
+for i=1:num_samples2/2
+    Y2(:,i) = awgn(pos_point2, num_samples2/2);
+    l2(i) = 1;
 end
+for i=num_samples2/2 + 1:num_samples2
+    Y2(:,i) = awgn(neg_point2, num_samples2/2);
+    l2(i) = 2;
+end
+
+
+x2=zeros(size(curr_kernel,2), numel(l2));  % Must be the size of the kernel matrix
+for i=1:num_samples2
+    x2(:,i) = getCoeffs2(x2(:,i), Y2(:,i), Y, 0, lambda, eta, ranked_kappa, 1000, curr_kernel);
+    predictions(i, 1) = calcZis(eta, x2(:,i), ranked_mats, Y2(:,i), l2, Y, 0, ranked_kappa, curr_kernel);
+end
+pred_mask = (predictions'==l2)';
+display(['Predicted: ' num2str(100*sum(predictions'==l2)/numel(l2)) '%'])
