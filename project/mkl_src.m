@@ -72,7 +72,6 @@ l=trainsampleslabels+1;
 [sorted, idx] = sort(l);
 l=l(idx);
 Y=Y(:,idx);
-
 %% Make Dictionary
 Dict = Y;
 %% Make kernel functions
