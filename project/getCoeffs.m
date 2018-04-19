@@ -44,7 +44,7 @@ function [x] = getCoeffs(prev_x, y, A, kappa, lambda, eta, num_iter, train_idx)
     
     option.lambda = lambda;
     option.iter = num_iter;
-    option.SCMethod='l1qpAS';
+%     option.SCMethod='l1qpAS';
     x = KSRSC(curr_kernel, partial_kernel', single_kernel, option);
 end
 

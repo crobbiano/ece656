@@ -7,26 +7,33 @@ addpath(genpath('srv1_9'));
 warning('off', 'MATLAB:nargchk:deprecated');
 %% Load some data
 % Load images and labels
-pos_point = [30 30 40]';
-neg_point = [29 31 37]';
+point1 = [30 30 40]';
+point2 = [10 10 10]';
+point3 = [35 17 40]';
+point4 = [12 15 212]';
 
 % Make 20 random points around pos and neg
-num_samples=50;
-Y = zeros(numel(pos_point), num_samples);
-l = zeros(1, 10);
-for i=1:num_samples/2
-    Y(:,i) = awgn(pos_point, 2);
+num_samples=100;
+Y = zeros(numel(point1), num_samples);
+l = zeros(1, num_samples);
+for i=1:num_samples/4
+    Y(:,i) = awgn(point1, 10);
     l(i) = 1;
 end
-for i=num_samples/2 + 1:num_samples
-    Y(:,i) = awgn(neg_point, 2);
+for i=num_samples/4 + 1:num_samples/2
+    Y(:,i) = awgn(point2, 10);
     l(i) = 2;
 end
-
-for i=1:size(Y,2)
-    Ynorm(:, i) = Y(:,i)/norm(Y(:,i));
+for i=num_samples/2 + 1:num_samples*3/4
+    Y(:,i) = awgn(point3, 10);
+    l(i) = 3;
 end
-% Y = Ynorm;
+for i=num_samples*3/4 + 1:num_samples
+    Y(:,i) = awgn(point4, 10);
+    l(i) = 4;
+end
+%% Make Dictionary
+Dict = Y;
 %% Make kernel functions
 % Choose the kernel functions and make vector of them
 kappa  = { ...
@@ -75,82 +82,20 @@ kappa  = { ...
     @(x,y) exp((-(repmat(sum(x.^2,1)',1,size(y,2))-2*(x'*y)+repmat(sum(y.^2,1),size(x,2),1))/1.7)); ...
     @(x,y) exp((-(repmat(sum(x.^2,1)',1,size(y,2))-2*(x'*y)+repmat(sum(y.^2,1),size(x,2),1))/1.8)); ...
     };
-kappa2  = { ...
-    @(x,y) x'*y; ...            % Linear
-    @(x,y) (x'*y + 1); ...
-    @(x,y) (x'*y + 0.5)^2; ...  % Polynomial
-    @(x,y) (x'*y + 0.5)^3; ...
-    @(x,y) (x'*y + 0.5)^4; ...
-    @(x,y) (x'*y + 1.0)^2; ...
-    @(x,y) (x'*y + 1.0)^3; ...
-    @(x,y) (x'*y + 1.0)^4; ...
-    @(x,y) (x'*y + 1.5)^2; ...
-    @(x,y) (x'*y + 1.5)^3; ...
-    @(x,y) (x'*y + 1.5)^4; ...
-    @(x,y) (x'*y + 2.0)^2; ...
-    @(x,y) (x'*y + 2.0)^3; ...
-    @(x,y) (x'*y + 2.0)^4; ...
-    @(x,y) (x'*y + 2.5)^2; ...
-    @(x,y) (x'*y + 2.5)^3; ...
-    @(x,y) (x'*y + 2.5)^4; ...
-    @(x,y) tanh(0.1 + 1.0*(x'*y)); ...  % Hyperbolic Tangent
-    @(x,y) tanh(0.2 + 1.0*(x'*y)); ...
-    @(x,y) tanh(0.3 + 1.0*(x'*y)); ...
-    @(x,y) tanh(0.4 + 1.0*(x'*y)); ...
-    @(x,y) tanh(0.5 + 1.0*(x'*y)); ...
-    @(x,y) tanh(0.5 + 0.2*(x'*y)); ...
-    @(x,y) tanh(0.5 + 0.4*(x'*y)); ...
-    @(x,y) tanh(0.5 + 0.6*(x'*y)); ...
-    @(x,y) tanh(0.5 + 0.8*(x'*y)); ...
-    @(x,y) exp((-norm(x-y)^2/0.1)); ...  % Gaussian
-    @(x,y) exp((-norm(x-y)^2/0.2)); ...
-    @(x,y) exp((-norm(x-y)^2/0.3)); ...
-    @(x,y) exp((-norm(x-y)^2/0.4)); ...
-    @(x,y) exp((-norm(x-y)^2/0.5)); ...
-    @(x,y) exp((-norm(x-y)^2/0.6)); ...
-    @(x,y) exp((-norm(x-y)^2/0.7)); ...
-    @(x,y) exp((-norm(x-y)^2/0.8)); ...
-    @(x,y) exp((-norm(x-y)^2/0.9)); ...
-    @(x,y) exp((-norm(x-y)^2/1.0)); ...
-    @(x,y) exp((-norm(x-y)^2/1.1)); ...
-    @(x,y) exp((-norm(x-y)^2/1.2)); ...
-    @(x,y) exp((-norm(x-y)^2/1.3)); ...
-    @(x,y) exp((-norm(x-y)^2/1.4)); ...
-    @(x,y) exp((-norm(x-y)^2/1.5)); ...
-    @(x,y) exp((-norm(x-y)^2/1.6)); ...
-    @(x,y) exp((-norm(x-y)^2/1.7)); ...
-    @(x,y) exp((-norm(x-y)^2/1.8)); ...
-    };
 %% Compute the M kernel matrices
 % Find K_m(Y, Y) for all M kernel functions
 kernel_mats = cell(length(kappa), 1);
 for m=1:length(kappa)
     option.kernel = 'cust'; option.kernelfnc=kappa{m};
-    kernel_mats{m} = computeKernelMatrix(Y,Y,option);
+    kernel_mats{m} = computeKernelMatrix(Dict,Dict,option);
 end
-
-kernel_mats2 = cell(length(kappa), 1);
-for m=1:length(kappa)
-    K = zeros(size(Y,2), size(Y,2));
-    for i=1:size(Y,2)
-        for j=1:size(Y,2)
-            K(i,j) = kappa2{m}(Y(:,i), Y(:,j));
-        end
-    end
-    kernel_mats2{m} = K;
-end
-
-for i=1:length(kappa)
-    errors(i) = sum(sum((kernel_mats{i}-kernel_mats2{i})^2));
-end
-
 
 % Make the ideal matrix - FIXME - assumes blocks of samples (probably fine)
-K_ideal = eye(size(Y,2));
+K_ideal = eye(size(Dict,2));
 % Find the number of samples in each class
 classes = unique(l);
 num_classes = numel(classes);
-masks = zeros(size(Y,2),numel(classes));
+masks = zeros(size(Dict,2),numel(classes));
 for i=1:num_classes
     num_samples_per_class(i) = sum(l == classes(i));
     masks(:,i) = l == classes(i);
@@ -190,26 +135,26 @@ eta(1) = 1;
 % x_i = argmin_x (k(y_i, y_i)+ x^TK(Y_tilde, Y_tilde)x - 2K(y_i, Y_tilde)x - lambda||x_i||^1)
 x=zeros(size(Y,2), numel(l));
 for i=1:size(Y,2)
-    x(:,i) = getCoeffs(x(:,i), Y(:,i), Y, ranked_kappa, lambda, eta, 5000, i);
+    x(:,i) = getCoeffs(x(:,i), Y(:,i), Dict, ranked_kappa, lambda, eta, 5000, i);
 end
 
 %% Iterate until quitting conditions are satisfied
 t=0;
-h = zeros(1, size(Y,2));
+h = zeros(1, size(Dict,2));
 while(t <= T && err>= err_thresh)
-%     x=zeros(size(Y,2), numel(l));
+    x=zeros(size(Dict,2), numel(l));
     for i=1:N
         % Compute the sparse code x_i
-        x(:,i) = getCoeffs(x(:,i), Y(:,i), Y, ranked_kappa, lambda, eta, 5000, i);
+        x(:,i) = getCoeffs(x(:,i), Y(:,i), Dict, ranked_kappa, lambda, eta, 5000, i);
         % Compute the predicted label h_i using x_i
-        h(i) = calcZis(x(:,i), Y(:,i), Y, ranked_kappa, eta, l);
+        h(i) = calcZis(x(:,i), Y(:,i), Dict, ranked_kappa, eta, l);
     end
     
     % Precompute the predicted labels for each base kernel
     g = zeros(length(kappa), N);
     for ker_num=1:length(kappa)
         for i=1:N
-            g(ker_num, i) = calcZis(x(:,i), Y(:,i), Y, ranked_kappa{ker_num}, 1, l);
+            g(ker_num, i) = calcZis(x(:,i), Y(:,i), Dict, ranked_kappa{ker_num}, 1, l);
         end
     end
     
@@ -276,27 +221,40 @@ while(t <= T && err>= err_thresh)
 end
 
 %% Classify some new points
-pos_point2 = [30 30 40]';
-neg_point2 = [29 31 37]';
+%% Load some more data
+% Load images and labels
+point12 = [30 30 40]';
+point22 = [10 10 10]';
+point32 = [35 17 40]';
+point42 = [12 15 212]';
 
 % Make 20 random points around pos and neg
-num_samples2=20;
-Y2 = zeros(numel(pos_point2), num_samples2);
+num_samples2=100;
+Y2 = zeros(numel(point12), num_samples2);
 l2 = zeros(1, num_samples2);
-for i=1:num_samples2/2
-    Y2(:,i) = awgn(pos_point2, 2);
+for i=1:num_samples2/4
+    Y2(:,i) = awgn(point12, 10);
     l2(i) = 1;
 end
-for i=num_samples2/2 + 1:num_samples2
-    Y2(:,i) = awgn(neg_point2, 2);
+for i=num_samples2/4 + 1:num_samples2/2
+    Y2(:,i) = awgn(point22, 10);
     l2(i) = 2;
+end
+for i=num_samples2/2 + 1:num_samples2*3/4
+    Y2(:,i) = awgn(point32, 10);
+    l2(i) = 3;
+end
+for i=num_samples2*3/4 + 1:num_samples2
+    Y2(:,i) = awgn(point42, 10);
+    l2(i) = 4;
 end
 
 
 x2=zeros(size(Y,2), num_samples2);  % Must be the size of the kernel matrix
+predictions = zeros(num_samples2, 1);
 for i=1:num_samples2
-    x2(:,i) = getCoeffs(x2(:,i), Y2(:,i), Y, ranked_kappa, lambda, eta, 5000, 0);
-    predictions(i, 1) = calcZis(x2(:,i), Y2(:,i), Y, ranked_kappa, eta, l2);
+    x2(:,i) = getCoeffs(x2(:,i), Y2(:,i), Dict, ranked_kappa, lambda, eta, 5000, 0);
+    predictions(i, 1) = calcZis(x2(:,i), Y2(:,i), Dict, ranked_kappa, eta, l2);
 end
 pred_mask = (predictions'==l2)';
 display(['Predicted: ' num2str(100*sum(predictions'==l2)/numel(l2)) '%'])
