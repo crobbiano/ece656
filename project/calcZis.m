@@ -61,15 +61,14 @@ function [ z ] = calcZis(x, y, A, kappa, eta, ls)
         num_y_per_class(i) = sum(ls == classes(i));
     end
     
-    % Find class - FIXME - need to calculate the curr_kernel(i,i) for the
-    % new y as well as curr_kernel(i, Y)
+    % Find class
     z=zeros(1, size(y,2));
     for i=1:size(y,2)
         err = zeros(1, num_classes);
         for class=1:num_classes
-            x_c = x((class-1)*num_y_per_class + 1:(class-1)*num_y_per_class + num_y_per_class ,i);
-            kernel_c = curr_kernel((class-1)*num_y_per_class + 1:(class-1)*num_y_per_class + num_y_per_class ,(class-1)*num_y_per_class + 1:(class-1)*num_y_per_class + num_y_per_class );
-            partial_c = partial_kernel((class-1)*num_y_per_class + 1:(class-1)*num_y_per_class + num_y_per_class );
+            x_c = x((class-1)*num_y_per_class(i) + 1:(class-1)*num_y_per_class(i) + num_y_per_class(i) ,i);
+            kernel_c = curr_kernel((class-1)*num_y_per_class(i) + 1:(class-1)*num_y_per_class(i) + num_y_per_class(i) ,(class-1)*num_y_per_class(i) + 1:(class-1)*num_y_per_class + num_y_per_class );
+            partial_c = partial_kernel((class-1)*num_y_per_class(i) + 1:(class-1)*num_y_per_class(i) + num_y_per_class(i) );
             err(class) = single_kernel + x_c'*kernel_c*x_c - 2*partial_c*x_c;
         end
         [~, z(i)] = min(err);

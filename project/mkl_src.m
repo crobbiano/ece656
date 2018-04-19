@@ -13,25 +13,66 @@ point3 = [35 17 40]';
 point4 = [12 15 212]';
 
 % Make 20 random points around pos and neg
-num_samples=100;
-Y = zeros(numel(point1), num_samples);
-l = zeros(1, num_samples);
-for i=1:num_samples/4
-    Y(:,i) = awgn(point1, 10);
-    l(i) = 1;
+% num_samples=100;
+% Y = zeros(numel(point1), num_samples);
+% l = zeros(1, num_samples);
+% for i=1:num_samples/4
+%     Y(:,i) = awgn(point1, 10);
+%     l(i) = 1;
+% end
+% for i=num_samples/4 + 1:num_samples/2
+%     Y(:,i) = awgn(point2, 10);
+%     l(i) = 2;
+% end
+% for i=num_samples/2 + 1:num_samples*3/4
+%     Y(:,i) = awgn(point3, 10);
+%     l(i) = 3;
+% end
+% for i=num_samples*3/4 + 1:num_samples
+%     Y(:,i) = awgn(point4, 10);
+%     l(i) = 4;
+% end
+%% MNIST Data
+total_num_training = 60000;
+total_num_testing = 10000;
+total_num = total_num_training  + total_num_testing;
+% Read in all training and testing images and labels
+[trainimgs,trainlabels,testimgs,testlabels] = readMNIST(total_num, 'C:\Users\cskunk\Documents\ece656\compass2\MNIST');
+
+allimgs = [trainimgs, testimgs];
+alllabels = [trainlabels; testlabels]';
+
+[trainsamples trainsamplesidxs] = datasample(allimgs,size(allimgs,2)*.003, 'Replace', false);
+trainsampleslabels = alllabels(trainsamplesidxs);
+
+% find the non sampled images and store them
+othersamplesidxs = setdiff(1:size(allimgs,2), trainsamplesidxs);
+othersamples = allimgs(othersamplesidxs);
+othersampleslabel = alllabels(othersamplesidxs);
+
+% generate testing and validation sets
+numothers = numel(othersamples);
+[testsamples testsamplesidxs] = datasample(othersamples,numothers*.5, 'Replace', false);
+testsampleslabels = othersampleslabel(testsamplesidxs);
+
+trainsamples_vec = zeros(28*28, numel(trainsamples));
+testsamples_vec = zeros(28*28, numel(testsamples));
+% imshow(reshape(trainsamples_vec(:,1), 28, 28))
+writefiles = 0;
+
+for i = 1:numel(trainsamples)
+    trainsamples_vec(:, i) = reshape(trainsamples{i}, 28*28, 1);
 end
-for i=num_samples/4 + 1:num_samples/2
-    Y(:,i) = awgn(point2, 10);
-    l(i) = 2;
+for i = 1:numel(testsamples)
+    testsamples_vec(:, i) = reshape(testsamples{i}, 28*28, 1);
 end
-for i=num_samples/2 + 1:num_samples*3/4
-    Y(:,i) = awgn(point3, 10);
-    l(i) = 3;
-end
-for i=num_samples*3/4 + 1:num_samples
-    Y(:,i) = awgn(point4, 10);
-    l(i) = 4;
-end
+
+Y=trainsamples_vec;
+l=trainsampleslabels+1;
+[sorted, idx] = sort(l);
+l=l(idx);
+Y=Y(:,idx);
+
 %% Make Dictionary
 Dict = Y;
 %% Make kernel functions
@@ -133,11 +174,10 @@ eta(1) = 1;
 % For each ith training sample, 0 out the ith row
 % by solving (18) in the paper.
 % x_i = argmin_x (k(y_i, y_i)+ x^TK(Y_tilde, Y_tilde)x - 2K(y_i, Y_tilde)x - lambda||x_i||^1)
-x=zeros(size(Y,2), numel(l));
-for i=1:size(Y,2)
-    x(:,i) = getCoeffs(x(:,i), Y(:,i), Dict, ranked_kappa, lambda, eta, 5000, i);
-end
-
+% x=zeros(size(Y,2), numel(l));
+% for i=1:size(Y,2)
+%     x(:,i) = getCoeffs(x(:,i), Y(:,i), Dict, ranked_kappa, lambda, eta, 200, i);
+% end
 %% Iterate until quitting conditions are satisfied
 t=0;
 h = zeros(1, size(Dict,2));
@@ -145,7 +185,7 @@ while(t <= T && err>= err_thresh)
     x=zeros(size(Dict,2), numel(l));
     for i=1:N
         % Compute the sparse code x_i
-        x(:,i) = getCoeffs(x(:,i), Y(:,i), Dict, ranked_kappa, lambda, eta, 5000, i);
+        x(:,i) = getCoeffs(x(:,i), Y(:,i), Dict, ranked_kappa, lambda, eta, 200, i);
         % Compute the predicted label h_i using x_i
         h(i) = calcZis(x(:,i), Y(:,i), Dict, ranked_kappa, eta, l);
     end
