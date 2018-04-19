@@ -1,58 +1,76 @@
-function [ z ] = calcZis( eta, x, kernel_mats, samples, ls, A, scratch_num, kappa, curr_kernel)
+function [ z ] = calcZis(x, y, A, kappa, eta, ls)
     %calcZis Calculates the zi's
     %   Find the current kernel which is a mixture of all ranked kernels
-    %   then classifies all samples using the current kernel and
+    %   then classifies all y using the current kernel and
     %   zi == 1 if classification is correct
-      
-    full_kernel = zeros(size(A,2), size(A,2));
-    single_kappa = 0;
-    partial_kappa = zeros(1, size(A,2));
-    samples_norm = samples/norm(samples, 2);
-    for m=1:length(eta)
-        K = zeros(size(A,2), size(A,2));
-        for i=1:size(A,2)
-            for j=1:size(A,2)
-                K(i,j) = kappa{m}(A(:,i), A(:,j));
-            end
-            partial_kappa(i) = partial_kappa(i) +  eta(m)*kappa{m}(samples_norm, A(:,i));
-        end
-        full_kernel = full_kernel + eta(m)*K;
-        single_kappa = single_kappa + eta(m)*kappa{m}(samples_norm,samples_norm);
-    end
-%     
-%     full_kernel(scratch_num, :) = 0;
-%     full_kernel(:, scratch_num) = 0;
-%     partial_kappa(:, scratch_num) = 0;
     
-    % get current kernel function
-    if iscell(kernel_mats)
-        curr_kernel = zeros(size(kernel_mats{1},1));
-        for i=1:length(eta)
-            curr_kernel = curr_kernel + eta(i)*kernel_mats{i};
+    % compute the current kernel based on weights
+    curr_kernel = zeros(size(A,2));
+    % Some tom-foolry with the partial kernel to make it work with under lying operations
+    % stick the sample, y, in the first column of a matrix of size A and zero out everying
+    % else.  then after the computation is done, extract the first column again
+    partial_kernel = zeros(size(A,2));
+    %         partial_kernel = zeros(1, size(A,2));
+    
+    single_kernel = 0;
+    y_mat = zeros(size(A));
+    y_mat(:,1) = y;
+    
+    for i=1:length(kappa)
+        if iscell(kappa)
+            option.kernel = 'cust'; option.kernelfnc=kappa{i};
+        else
+            option.kernel = 'cust'; option.kernelfnc=kappa;
         end
-    else
-        curr_kernel = zeros(size(kernel_mats,1));
-        for i=1:length(eta)
-            curr_kernel = curr_kernel + eta(i)*kernel_mats;
-        end
+        
+        curr_kernel = curr_kernel + eta(i)*computeKernelMatrix(A,A,option);
+        partial_kernel = partial_kernel + eta(i)*computeKernelMatrix(y_mat,A,option);
+        single_kernel = single_kernel + eta(i)*computeKernelMatrix(y,y,option);
     end
     
-    % Find the number of samples in each class
+    partial_kernel = partial_kernel(1,:);
+    
+    %     for m=1:length(kappa)
+    %         K = zeros(size(A,2), size(A,2));
+    %         for i=1:size(A,2)
+    %             for j=1:size(A,2)
+    %                 if iscell(kappa)
+    %                     K(i,j) = eta(m)*kappa{m}(A(:,i), A(:,j));
+    %                 else
+    %                     K(i,j) = eta(m)*kappa(A(:,i), A(:,j));
+    %                 end
+    %             end
+    %             if iscell(kappa)
+    %                 partial_kernel(i) = partial_kernel(i) + eta(m)*kappa{m}(y, A(:,i));
+    %             else
+    %                 partial_kernel(i) = partial_kernel(i) + eta(m)*kappa(y, A(:,i));
+    %             end
+    %         end
+    %         curr_kernel = curr_kernel + K;
+    %         if iscell(kappa)
+    %             single_kernel = single_kernel + eta(m)*kappa{m}(y, y);
+    %         else
+    %             single_kernel = single_kernel + eta(m)*kappa(y, y);
+    %         end
+    %     end
+    
+    % Find the number of y in each class
     classes = unique(ls);
     num_classes = numel(classes);
     for i=1:num_classes
-        num_samples_per_class(i) = sum(ls == classes(i));
+        num_y_per_class(i) = sum(ls == classes(i));
     end
     
     % Find class - FIXME - need to calculate the curr_kernel(i,i) for the
-    % new samples as well as curr_kernel(i, Y)
-    z=zeros(1, size(samples,2));
-    for i=1:size(samples,2)
-        err = [];
+    % new y as well as curr_kernel(i, Y)
+    z=zeros(1, size(y,2));
+    for i=1:size(y,2)
+        err = zeros(1, num_classes);
         for class=1:num_classes
-            err(class) = curr_kernel(i,i) + x(class:class + num_samples_per_class - 1,i)'*...
-                curr_kernel(class:class + num_samples_per_class - 1,class:class + num_samples_per_class - 1)*x(class:class + num_samples_per_class - 1,i)...
-                - 2*curr_kernel(i,class:class + num_samples_per_class - 1)*x(class:class + num_samples_per_class - 1,i);
+            x_c = x((class-1)*num_y_per_class + 1:(class-1)*num_y_per_class + num_y_per_class ,i);
+            kernel_c = curr_kernel((class-1)*num_y_per_class + 1:(class-1)*num_y_per_class + num_y_per_class ,(class-1)*num_y_per_class + 1:(class-1)*num_y_per_class + num_y_per_class );
+            partial_c = partial_kernel((class-1)*num_y_per_class + 1:(class-1)*num_y_per_class + num_y_per_class );
+            err(class) = single_kernel + x_c'*kernel_c*x_c - 2*partial_c*x_c;
         end
         [~, z(i)] = min(err);
     end
