@@ -66,9 +66,11 @@ function [ z ] = calcZis(x, y, A, kappa, eta, ls)
     for i=1:size(y,2)
         err = zeros(1, num_classes);
         for class=1:num_classes
-            x_c = x((class-1)*num_y_per_class(i) + 1:(class-1)*num_y_per_class(i) + num_y_per_class(i) ,i);
-            kernel_c = curr_kernel((class-1)*num_y_per_class(i) + 1:(class-1)*num_y_per_class(i) + num_y_per_class(i) ,(class-1)*num_y_per_class(i) + 1:(class-1)*num_y_per_class + num_y_per_class );
-            partial_c = partial_kernel((class-1)*num_y_per_class(i) + 1:(class-1)*num_y_per_class(i) + num_y_per_class(i) );
+            b_idx = sum(num_y_per_class(1:class-1)) + 1;
+            e_idx = sum(num_y_per_class(1:class));
+            x_c = x(b_idx:e_idx ,i);
+            kernel_c = curr_kernel(b_idx:e_idx ,b_idx:e_idx);
+            partial_c = partial_kernel(b_idx:e_idx);
             err(class) = single_kernel + x_c'*kernel_c*x_c - 2*partial_c*x_c;
         end
         [~, z(i)] = min(err);
