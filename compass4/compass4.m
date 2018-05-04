@@ -103,4 +103,4 @@ hold off
 compression_rate = 512 / 16
 compression_rate_real = (8*512*512) / (((512*512)/(stride*stride)) * log2(64))
 
-% Reconstructed images look good around 2^10 
+% Reconstructed images look good around 2^10 features
