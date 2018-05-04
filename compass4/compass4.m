@@ -30,7 +30,8 @@ end
 P1 = image_vecs{1};
 net_num = 1;
 maps = {[4 4], [4 8], [8 8], [8 16], [16 16], [16 32], [32 32]};
-for n=1:length(maps)
+% for n=1:length(maps)
+for n=1:1
     nets{net_num} = selforgmap(maps{n});
     nets{net_num} = configure(nets{net_num},P1);
     nets{net_num}.trainParam.epochs = 500;
@@ -101,6 +102,6 @@ hold off
 % for storage -> comrpession rate = image size / block size; in naive sense
 % for communication -> 8bpp * num_pixels turns into num_blocks*log2(num_features)
 compression_rate = 512 / 16
-compression_rate_real = (8*512*512) / (((512*512)/(stride*stride)) * log2(64))
+compression_rate_real = (8*512*512) / (((512*512)/(stride*stride)) * log2(128))
 
 % Reconstructed images look good around 2^10 features
